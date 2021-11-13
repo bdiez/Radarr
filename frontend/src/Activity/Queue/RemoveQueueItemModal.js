@@ -22,7 +22,7 @@ class RemoveQueueItemModal extends Component {
 
     this.state = {
       remove: true,
-      blacklist: false
+      blocklist: false
     };
   }
 
@@ -32,7 +32,7 @@ class RemoveQueueItemModal extends Component {
   resetState = function() {
     this.setState({
       remove: true,
-      blacklist: false
+      blocklist: false
     });
   }
 
@@ -43,8 +43,8 @@ class RemoveQueueItemModal extends Component {
     this.setState({ remove: value });
   }
 
-  onBlacklistChange = ({ value }) => {
-    this.setState({ blacklist: value });
+  onBlocklistChange = ({ value }) => {
+    this.setState({ blocklist: value });
   }
 
   onRemoveConfirmed = () => {
@@ -66,10 +66,11 @@ class RemoveQueueItemModal extends Component {
     const {
       isOpen,
       sourceTitle,
-      canIgnore
+      canIgnore,
+      isPending
     } = this.props;
 
-    const { remove, blacklist } = this.state;
+    const { remove, blocklist } = this.state;
 
     return (
       <Modal
@@ -89,27 +90,31 @@ class RemoveQueueItemModal extends Component {
               {translate('RemoveFromQueueText', [sourceTitle])}
             </div>
 
-            <FormGroup>
-              <FormLabel>{translate('RemoveFromDownloadClient')}</FormLabel>
+            {
+              isPending ?
+                null :
+                <FormGroup>
+                  <FormLabel>{translate('RemoveFromDownloadClient')}</FormLabel>
 
+                  <FormInputGroup
+                    type={inputTypes.CHECK}
+                    name="remove"
+                    value={remove}
+                    helpTextWarning={translate('RemoveHelpTextWarning')}
+                    isDisabled={!canIgnore}
+                    onChange={this.onRemoveChange}
+                  />
+                </FormGroup>
+            }
+
+            <FormGroup>
+              <FormLabel>{translate('BlocklistRelease')}</FormLabel>
               <FormInputGroup
                 type={inputTypes.CHECK}
-                name="remove"
-                value={remove}
-                helpTextWarning={translate('RemoveHelpTextWarning')}
-                isDisabled={!canIgnore}
-                onChange={this.onRemoveChange}
-              />
-            </FormGroup>
-
-            <FormGroup>
-              <FormLabel>{translate('BlacklistRelease')}</FormLabel>
-              <FormInputGroup
-                type={inputTypes.CHECK}
-                name="blacklist"
-                value={blacklist}
-                helpText={translate('BlacklistHelpText')}
-                onChange={this.onBlacklistChange}
+                name="blocklist"
+                value={blocklist}
+                helpText={translate('BlocklistHelpText')}
+                onChange={this.onBlocklistChange}
               />
             </FormGroup>
 
@@ -137,6 +142,7 @@ RemoveQueueItemModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   sourceTitle: PropTypes.string.isRequired,
   canIgnore: PropTypes.bool.isRequired,
+  isPending: PropTypes.bool.isRequired,
   onRemovePress: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired
 };

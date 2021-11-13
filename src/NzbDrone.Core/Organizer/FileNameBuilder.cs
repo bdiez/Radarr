@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -67,6 +68,33 @@ namespace NzbDrone.Core.Organizer
 
         private static readonly Regex TitlePrefixRegex = new Regex(@"^(The|An|A) (.*?)((?: *\([^)]+\))*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        private static readonly Regex ReservedDeviceNamesRegex = new Regex(@"^(?:aux|com[1-9]|con|lpt[1-9]|nul|prn)\.", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        // generated from https://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt
+        public static readonly ImmutableDictionary<string, string> Iso639BTMap = new Dictionary<string, string>
+        {
+            { "alb", "sqi" },
+            { "arm", "hye" },
+            { "baq", "eus" },
+            { "bur", "mya" },
+            { "chi", "zho" },
+            { "cze", "ces" },
+            { "dut", "nld" },
+            { "fre", "fra" },
+            { "geo", "kat" },
+            { "ger", "deu" },
+            { "gre", "ell" },
+            { "ice", "isl" },
+            { "mac", "mkd" },
+            { "mao", "mri" },
+            { "may", "msa" },
+            { "per", "fas" },
+            { "rum", "ron" },
+            { "slo", "slk" },
+            { "tib", "bod" },
+            { "wel", "cym" }
+        }.ToImmutableDictionary();
+
         public FileNameBuilder(INamingConfigService namingConfigService,
                                IQualityDefinitionService qualityDefinitionService,
                                IUpdateMediaInfo mediaInfoUpdater,
@@ -119,6 +147,7 @@ namespace NzbDrone.Core.Organizer
 
                 component = FileNameCleanupRegex.Replace(component, match => match.Captures[0].Value[0].ToString());
                 component = TrimSeparatorsRegex.Replace(component, string.Empty);
+                component = ReplaceReservedDeviceNames(component);
 
                 if (component.IsNotNullOrWhiteSpace())
                 {
@@ -180,6 +209,7 @@ namespace NzbDrone.Core.Organizer
 
                 var component = ReplaceTokens(splitPattern, tokenHandlers, namingConfig);
                 component = CleanFolderName(component);
+                component = ReplaceReservedDeviceNames(component);
 
                 if (component.IsNotNullOrWhiteSpace())
                 {
@@ -340,8 +370,8 @@ namespace NzbDrone.Core.Organizer
             var videoCodec = MediaInfoFormatter.FormatVideoCodec(movieFile.MediaInfo, sceneName);
             var audioCodec = MediaInfoFormatter.FormatAudioCodec(movieFile.MediaInfo, sceneName);
             var audioChannels = MediaInfoFormatter.FormatAudioChannels(movieFile.MediaInfo);
-            var audioLanguages = movieFile.MediaInfo.AudioLanguages ?? string.Empty;
-            var subtitles = movieFile.MediaInfo.Subtitles ?? string.Empty;
+            var audioLanguages = movieFile.MediaInfo.AudioLanguages ?? new List<string>();
+            var subtitles = movieFile.MediaInfo.Subtitles ?? new List<string>();
 
             var mediaInfoAudioLanguages = GetLanguagesToken(audioLanguages);
             if (!mediaInfoAudioLanguages.IsNullOrWhiteSpace())
@@ -361,7 +391,7 @@ namespace NzbDrone.Core.Organizer
                 mediaInfoSubtitleLanguages = $"[{mediaInfoSubtitleLanguages}]";
             }
 
-            var videoBitDepth = movieFile.MediaInfo.VideoBitDepth > 0 ? movieFile.MediaInfo.VideoBitDepth.ToString() : string.Empty;
+            var videoBitDepth = movieFile.MediaInfo.VideoBitDepth > 0 ? movieFile.MediaInfo.VideoBitDepth.ToString() : 8.ToString();
             var audioChannelsFormatted = audioChannels > 0 ?
                                 audioChannels.ToString("F1", CultureInfo.InvariantCulture) :
                                 string.Empty;
@@ -401,42 +431,29 @@ namespace NzbDrone.Core.Organizer
             tokenHandlers["{Custom Formats}"] = m => string.Join(" ", customFormats.Where(x => x.IncludeCustomFormatWhenRenaming));
         }
 
-        private string GetLanguagesToken(string mediaInfoLanguages)
+        private string GetLanguagesToken(List<string> mediaInfoLanguages)
         {
-            List<string> tokens = new List<string>();
-            foreach (var item in mediaInfoLanguages.Split('/'))
+            var tokens = new List<string>();
+            foreach (var item in mediaInfoLanguages)
             {
-                if (!string.IsNullOrWhiteSpace(item))
+                if (!string.IsNullOrWhiteSpace(item) && item != "und")
                 {
                     tokens.Add(item.Trim());
                 }
             }
 
-            var cultures = CultureInfo.GetCultures(CultureTypes.NeutralCultures);
             for (int i = 0; i < tokens.Count; i++)
             {
-                if (tokens[i] == "Swedis")
-                {
-                    // Probably typo in mediainfo (should be 'Swedish')
-                    tokens[i] = "SV";
-                    continue;
-                }
-
-                if (tokens[i] == "Chinese" && OsInfo.IsNotWindows)
-                {
-                    // Mono only has 'Chinese (Simplified)' & 'Chinese (Traditional)'
-                    tokens[i] = "ZH";
-                    continue;
-                }
-
                 try
                 {
-                    var cultureInfo = cultures.FirstOrDefault(p => p.EnglishName.RemoveAccent() == tokens[i]);
-
-                    if (cultureInfo != null)
+                    var token = tokens[i].ToLowerInvariant();
+                    if (Iso639BTMap.TryGetValue(token, out var mapped))
                     {
-                        tokens[i] = cultureInfo.TwoLetterISOLanguageName.ToUpper();
+                        token = mapped;
                     }
+
+                    var cultureInfo = new CultureInfo(token);
+                    tokens[i] = cultureInfo.TwoLetterISOLanguageName.ToUpper();
                 }
                 catch
                 {
@@ -565,6 +582,12 @@ namespace NzbDrone.Core.Organizer
             }
 
             return Path.GetFileNameWithoutExtension(movieFile.RelativePath);
+        }
+
+        private string ReplaceReservedDeviceNames(string input)
+        {
+            // Replace reserved windows device names with an alternative
+            return ReservedDeviceNamesRegex.Replace(input, match => match.Value.Replace(".", "_"));
         }
     }
 

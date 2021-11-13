@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Movies;
 
 namespace NzbDrone.Core.Notifications.Emby
@@ -38,7 +39,7 @@ namespace NzbDrone.Core.Notifications.Emby
             }
         }
 
-        public override void OnMovieRename(Movie movie)
+        public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
         {
             if (Settings.UpdateLibrary)
             {
@@ -51,6 +52,35 @@ namespace NzbDrone.Core.Notifications.Emby
             if (Settings.Notify)
             {
                 _mediaBrowserService.Notify(Settings, HEALTH_ISSUE_TITLE_BRANDED, message.Message);
+            }
+        }
+
+        public override void OnMovieDelete(MovieDeleteMessage deleteMessage)
+        {
+            if (deleteMessage.DeletedFiles)
+            {
+                if (Settings.Notify)
+                {
+                    _mediaBrowserService.Notify(Settings, MOVIE_DELETED_TITLE_BRANDED, deleteMessage.Message);
+                }
+
+                if (Settings.UpdateLibrary)
+                {
+                    _mediaBrowserService.UpdateMovies(Settings, deleteMessage.Movie, "Deleted");
+                }
+            }
+        }
+
+        public override void OnMovieFileDelete(MovieFileDeleteMessage deleteMessage)
+        {
+            if (Settings.Notify)
+            {
+                _mediaBrowserService.Notify(Settings, MOVIE_FILE_DELETED_TITLE_BRANDED, deleteMessage.Message);
+            }
+
+            if (Settings.UpdateLibrary)
+            {
+                _mediaBrowserService.UpdateMovies(Settings, deleteMessage.Movie, "Deleted");
             }
         }
 

@@ -42,14 +42,14 @@ class QueueRow extends Component {
     this.setState({ isRemoveQueueItemModalOpen: true });
   }
 
-  onRemoveQueueItemModalConfirmed = (blacklist) => {
+  onRemoveQueueItemModalConfirmed = (blocklist) => {
     const {
       onRemoveQueueItemPress,
       onQueueRowModalOpenOrClose
     } = this.props;
 
     onQueueRowModalOpenOrClose(false);
-    onRemoveQueueItemPress(blacklist);
+    onRemoveQueueItemPress(blocklist);
 
     this.setState({ isRemoveQueueItemModalOpen: false });
   }
@@ -332,6 +332,7 @@ class QueueRow extends Component {
           isOpen={isRemoveQueueItemModalOpen}
           sourceTitle={title}
           canIgnore={!!movie}
+          isPending={isPending}
           onRemovePress={this.onRemoveQueueItemModalConfirmed}
           onModalClose={this.onRemoveQueueItemModalClose}
         />

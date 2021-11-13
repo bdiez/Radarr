@@ -5,6 +5,7 @@ using System.Linq;
 using FluentValidation.Results;
 using NzbDrone.Common.Extensions;
 using NzbDrone.Core.MediaCover;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.MediaFiles.MediaInfo;
 using NzbDrone.Core.Movies;
 using NzbDrone.Core.Notifications.Discord.Payloads;
@@ -186,11 +187,11 @@ namespace NzbDrone.Core.Notifications.Discord
                         break;
                     case DiscordImportFieldType.Languages:
                         discordField.Name = "Languages";
-                        discordField.Value = message.MovieFile.MediaInfo.AudioLanguages;
+                        discordField.Value = message.MovieFile.MediaInfo.AudioLanguages.ConcatToString("/");
                         break;
                     case DiscordImportFieldType.Subtitles:
                         discordField.Name = "Subtitles";
-                        discordField.Value = message.MovieFile.MediaInfo.Subtitles;
+                        discordField.Value = message.MovieFile.MediaInfo.Subtitles.ConcatToString("/");
                         break;
                     case DiscordImportFieldType.Release:
                         discordField.Name = "Release";
@@ -209,6 +210,24 @@ namespace NzbDrone.Core.Notifications.Discord
             }
 
             var payload = CreatePayload(null, new List<Embed> { embed });
+
+            _proxy.SendPayload(payload, Settings);
+        }
+
+        public override void OnMovieRename(Movie movie, List<RenamedMovieFile> renamedFiles)
+        {
+            var attachments = new List<Embed>();
+
+            foreach (RenamedMovieFile renamedFile in renamedFiles)
+            {
+                attachments.Add(new Embed
+                {
+                    Title = movie.Title,
+                    Description = renamedFile.PreviousRelativePath + " renamed to " + renamedFile.MovieFile.RelativePath,
+                });
+            }
+
+            var payload = CreatePayload("Renamed", attachments);
 
             _proxy.SendPayload(payload, Settings);
         }
